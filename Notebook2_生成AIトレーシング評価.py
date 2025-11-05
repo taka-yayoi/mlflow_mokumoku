@@ -108,8 +108,8 @@ def simple_llm_call(question: str) -> str:
 
 # トレーシングなしで実行
 print("=== トレーシングなしの実行 ===")
-result = simple_llm_call("What is MLflow?")
-print(f"質問: What is MLflow?")
+result = simple_llm_call("MLflowとは何ですか？")
+print(f"質問: MLflowとは何ですか？")
 print(f"回答: {result}")
 print("\n⚠️ 実行履歴が残りません！")
 
@@ -138,8 +138,8 @@ def traced_llm_call(question: str) -> str:
 
 # トレーシングありで実行
 print("=== トレーシングありの実行 ===")
-result = traced_llm_call("How does tracing work?")
-print(f"質問: How does tracing work?")
+result = traced_llm_call("トレーシングはどのように機能しますか？")
+print(f"質問: トレーシングはどのように機能しますか？")
 print(f"回答: {result}")
 print("\n✅ トレースが記録されました！")
 print("右側の「Traces」タブから確認できます")
@@ -160,9 +160,9 @@ def retrieve_documents(query: str) -> list:
     """
     # モックドキュメント
     docs = [
-        "MLflow is an open-source platform for managing ML workflows.",
-        "MLflow provides tracking, projects, models, and registry components.",
-        "Tracing helps debug and optimize LLM applications."
+        "MLflowは機械学習ワークフローを管理するためのオープンソースプラットフォームです。",
+        "MLflowはトラッキング、プロジェクト、モデル、レジストリのコンポーネントを提供します。",
+        "トレーシングはLLMアプリケーションのデバッグと最適化に役立ちます。"
     ]
 
     return docs
@@ -205,7 +205,7 @@ def rag_pipeline(query: str) -> dict:
 
 # RAGパイプラインを実行
 print("=== RAGパイプラインの実行 ===")
-result = rag_pipeline("What is MLflow?")
+result = rag_pipeline("MLflowとは何ですか？")
 print(f"質問: {result['query']}")
 print(f"回答: {result['answer']}")
 print("\n✅ 全ステップがトレースされました！")
@@ -226,16 +226,20 @@ if len(traces) > 0:
     print("=== 最新のトレース情報 ===")
     print(f"トレース件数: {len(traces)}")
 
-    # 主要なカラムを表示
-    display_columns = []
-    for col in ['request_id', 'trace_name', 'execution_time_ms', 'status']:
-        if col in traces.columns:
-            display_columns.append(col)
-
-    if display_columns:
-        display(traces[display_columns].head())
-    else:
-        display(traces.head())
+    # 基本情報のみを表示（Arrowエラーを回避）
+    print("\n最新のトレース:")
+    for i, row in traces.head(5).iterrows():
+        print(f"\n--- トレース {i+1} ---")
+        if 'request_id' in traces.columns:
+            print(f"  リクエストID: {row.get('request_id', 'N/A')}")
+        if 'trace_name' in traces.columns:
+            print(f"  トレース名: {row.get('trace_name', 'N/A')}")
+        if 'execution_time_ms' in traces.columns:
+            exec_time = row.get('execution_time_ms', 0)
+            if exec_time:
+                print(f"  実行時間: {exec_time:.2f}ms")
+        if 'status' in traces.columns:
+            print(f"  ステータス: {row.get('status', 'N/A')}")
 else:
     print("⚠️ トレースが見つかりません")
 
@@ -268,18 +272,18 @@ import pandas as pd
 # 評価用のQAデータセット
 eval_data = pd.DataFrame({
     "question": [
-        "What is MLflow?",
-        "How does MLflow tracking work?",
-        "What is model registry?",
-        "How to deploy models with MLflow?",
-        "What is MLflow Projects?"
+        "MLflowとは何ですか？",
+        "MLflowのトラッキング機能はどのように動作しますか？",
+        "モデルレジストリとは何ですか？",
+        "MLflowを使ってモデルをデプロイする方法は？",
+        "MLflow Projectsとは何ですか？"
     ],
     "ground_truth": [
-        "MLflow is an open-source platform for managing the end-to-end machine learning lifecycle.",
-        "MLflow Tracking allows you to log parameters, metrics, and artifacts when running ML code.",
-        "Model Registry is a centralized model store for managing model versions and lifecycle.",
-        "MLflow Models can be deployed to various platforms using standard formats.",
-        "MLflow Projects package ML code in a reusable and reproducible format."
+        "MLflowは機械学習ライフサイクル全体を管理するためのオープンソースプラットフォームです。",
+        "MLflow Trackingを使用すると、MLコードを実行する際にパラメータ、メトリクス、アーティファクトをログできます。",
+        "モデルレジストリは、モデルのバージョンとライフサイクルを管理するための集中型モデルストアです。",
+        "MLflow Modelsは標準フォーマットを使用して、さまざまなプラットフォームにデプロイできます。",
+        "MLflow Projectsは、再利用可能で再現可能な形式でMLコードをパッケージ化します。"
     ]
 })
 
@@ -538,13 +542,13 @@ def simulate_production_traffic(num_requests=20):
     本番環境のリクエストをシミュレート
     """
     questions = [
-        "What is MLflow?",
-        "How does MLflow tracking work?",
-        "What is model registry?",
-        "How to deploy models?",
-        "What is MLflow Projects?",
-        "How to use MLflow with Python?",
-        "What are MLflow models?",
+        "MLflowとは何ですか？",
+        "MLflowのトラッキングはどのように機能しますか？",
+        "モデルレジストリとは何ですか？",
+        "モデルをデプロイする方法は？",
+        "MLflow Projectsとは何ですか？",
+        "PythonでMLflowを使用する方法は？",
+        "MLflowモデルとは何ですか？",
     ]
 
     traffic_data = []
