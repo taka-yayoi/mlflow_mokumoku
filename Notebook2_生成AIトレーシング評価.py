@@ -218,46 +218,7 @@ result = rag_pipeline("MLflowとは何ですか？")
 print(f"質問: {result['query']}")
 print(f"回答: {result['answer']}")
 print("\n✅ 全ステップがトレースされました！")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## トレースの確認
-# MAGIC
-# MAGIC トレース情報をプログラムで取得することもできます。
-
-# COMMAND ----------
-
-# 最新のトレースを取得
-traces = mlflow.search_traces()
-
-if len(traces) > 0:
-    print("=== 最新のトレース情報 ===")
-    print(f"トレース件数: {len(traces)}")
-
-    # 主要な情報を表示
-    print("\n最新のトレース:")
-    for idx in range(min(5, len(traces))):
-        row = traces.iloc[idx]
-        print(f"\n--- トレース {idx+1} ---")
-
-        # 一般的なカラム名を試す
-        for col_name in ['trace_id', 'request_id', 'timestamp_ms', 'execution_time_ms',
-                         'status', 'request_metadata', 'tags']:
-            if col_name in traces.columns:
-                value = row[col_name]
-                if value is not None and str(value) != '' and str(value) != 'nan':
-                    # 辞書やリストは表示しない（複雑すぎるため）
-                    if not isinstance(value, (dict, list)):
-                        if 'time_ms' in col_name and isinstance(value, (int, float)):
-                            print(f"  {col_name}: {value:.2f}ms")
-                        else:
-                            print(f"  {col_name}: {value}")
-
-    print("\n✅ トレース情報を確認できます")
-    print("📊 より詳細な情報は右側の「Traces」タブから確認してください")
-else:
-    print("⚠️ トレースが見つかりません")
+print("📊 右側の「Traces」タブから詳細を確認できます")
 
 # COMMAND ----------
 
