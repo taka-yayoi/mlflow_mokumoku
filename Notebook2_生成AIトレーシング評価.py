@@ -120,6 +120,12 @@ print("\n⚠️ 実行履歴が残りません！")
 # MAGIC ## Auto-tracingの有効化
 # MAGIC
 # MAGIC MLflowの**Auto-tracing**を使うと、LLM呼び出しを自動的にトレースできます。
+# MAGIC
+# MAGIC **span_type（スパンタイプ）**を設定することで、トレース画面に適切なアイコンが表示されます：
+# MAGIC - `LLM`: LLM呼び出し（💬アイコン）
+# MAGIC - `RETRIEVER`: ドキュメント検索（🔍アイコン）
+# MAGIC - `CHAIN`: 複数ステップの処理（🔗アイコン）
+# MAGIC - `TOOL`: ツール呼び出し（🔧アイコン）
 
 # COMMAND ----------
 
@@ -130,7 +136,7 @@ import mlflow.openai
 mlflow.openai.autolog()
 
 # トレースされる関数
-@mlflow.trace
+@mlflow.trace(span_type="LLM")
 def traced_llm_call(question: str) -> str:
     """
     トレースされるLLM呼び出し
@@ -155,7 +161,7 @@ print("右側の「Traces」タブから確認できます")
 
 # COMMAND ----------
 
-@mlflow.trace(name="retrieve_documents")
+@mlflow.trace(name="retrieve_documents", span_type="RETRIEVER")
 def retrieve_documents(query: str) -> list:
     """
     ドキュメント検索（モック）
@@ -169,7 +175,7 @@ def retrieve_documents(query: str) -> list:
 
     return docs
 
-@mlflow.trace(name="generate_answer")
+@mlflow.trace(name="generate_answer", span_type="LLM")
 def generate_answer(query: str, context: list) -> str:
     """
     コンテキストを使って回答生成
@@ -188,7 +194,7 @@ def generate_answer(query: str, context: list) -> str:
     # Databricks Foundation Model APIを使用
     return call_fmapi(prompt)
 
-@mlflow.trace(name="rag_pipeline")
+@mlflow.trace(name="rag_pipeline", span_type="CHAIN")
 def rag_pipeline(query: str) -> dict:
     """
     RAGパイプライン全体
@@ -290,15 +296,16 @@ else:
 import pandas as pd
 
 # 評価用のQAデータセット
+# mlflow.genai.evaluate()では 'inputs' と 'expectations' カラムが必要
 eval_data = pd.DataFrame({
-    "question": [
+    "inputs": [
         "MLflowとは何ですか？",
         "MLflowのトラッキング機能はどのように動作しますか？",
         "モデルレジストリとは何ですか？",
         "MLflowを使ってモデルをデプロイする方法は？",
         "MLflow Projectsとは何ですか？"
     ],
-    "ground_truth": [
+    "expectations": [
         "MLflowは機械学習ライフサイクル全体を管理するためのオープンソースプラットフォームです。",
         "MLflow Trackingを使用すると、MLコードを実行する際にパラメータ、メトリクス、アーティファクトをログできます。",
         "モデルレジストリは、モデルのバージョンとライフサイクルを管理するための集中型モデルストアです。",
@@ -325,10 +332,10 @@ def qa_model(question: str) -> str:
     return call_fmapi(question)
 
 # 予測を生成
-eval_data["prediction"] = eval_data["question"].apply(qa_model)
+eval_data["prediction"] = eval_data["inputs"].apply(qa_model)
 
 print("=== 予測結果 ===")
-display(eval_data[["question", "prediction"]])
+display(eval_data[["inputs", "prediction"]])
 
 # COMMAND ----------
 
@@ -345,13 +352,22 @@ from mlflow.genai.scorers import RelevanceToQuery, Correctness, Safety
 def predict_fn(inputs):
     """
     評価用のpredict関数
-    inputs: 'question'カラムを持つDataFrame
+    inputs: 'inputs'カラムを持つDataFrameまたは文字列のリスト
     returns: 予測結果のリスト
     """
     results = []
-    for question in inputs['question']:
-        prediction = qa_model(question)
-        results.append(prediction)
+
+    # DataFrameの場合
+    if isinstance(inputs, pd.DataFrame):
+        for question in inputs['inputs']:
+            prediction = qa_model(question)
+            results.append(prediction)
+    # リストの場合
+    else:
+        for question in inputs:
+            prediction = qa_model(question)
+            results.append(prediction)
+
     return results
 
 # 評価の実行
