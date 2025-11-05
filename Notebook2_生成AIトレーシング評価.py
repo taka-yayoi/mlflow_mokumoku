@@ -123,9 +123,10 @@ print("\n⚠️ 実行履歴が残りません！")
 # COMMAND ----------
 
 import mlflow
+import mlflow.openai
 
-# Auto-tracingを有効化
-mlflow.autolog()
+# Auto-tracingを有効化（OpenAI互換API用）
+mlflow.openai.autolog()
 
 # トレースされる関数
 @mlflow.trace
@@ -339,14 +340,15 @@ display(eval_data[["question", "prediction"]])
 
 from mlflow.genai.scorers import RelevanceToQuery, Correctness, Safety
 
-# 評価用のモデル関数を作成
-def qa_model_for_eval(inputs):
+# 評価用のpredict関数を作成
+def predict_fn(inputs):
     """
-    評価用のモデル関数（バッチ対応）
+    評価用のpredict関数
+    inputs: 'question'カラムを持つDataFrame
+    returns: 予測結果のリスト
     """
     results = []
-    for input_row in inputs.to_dict('records'):
-        question = input_row['question']
+    for question in inputs['question']:
         prediction = qa_model(question)
         results.append(prediction)
     return results
@@ -364,7 +366,7 @@ with mlflow.start_run(run_name="QA Model Evaluation with Judges"):
     # mlflow.genai.evaluateで評価
     eval_results = mlflow.genai.evaluate(
         data=eval_data,
-        model=qa_model_for_eval,
+        predict_fn=predict_fn,
         scorers=judges
     )
 
@@ -422,7 +424,7 @@ with mlflow.start_run(run_name="Advanced Judges Evaluation"):
     # mlflow.genai.evaluateで評価
     eval_results = mlflow.genai.evaluate(
         data=eval_data,
-        model=qa_model_for_eval,
+        predict_fn=predict_fn,
         scorers=advanced_judges
     )
 
@@ -507,7 +509,7 @@ with mlflow.start_run(run_name="Custom Scorer Evaluation"):
 
     eval_results = mlflow.genai.evaluate(
         data=eval_data,
-        model=qa_model_for_eval,
+        predict_fn=predict_fn,
         scorers=custom_scorers
     )
 
