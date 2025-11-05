@@ -421,8 +421,6 @@ with mlflow.start_run(run_name="Advanced Judges Evaluation"):
 
 # COMMAND ----------
 
-from mlflow.genai.scorers import make_genai_metric_scorer
-
 # カスタムScorer: 回答の長さを評価
 def length_scorer(inputs, outputs):
     """
