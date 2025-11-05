@@ -297,14 +297,14 @@ import pandas as pd
 
 # 評価用のQAデータセット
 # mlflow.genai.evaluate()では 'inputs' と 'expectations' カラムが必要
-# expectationsは辞書形式である必要がある
+# inputs と expectations はどちらも辞書形式である必要がある
 eval_data = pd.DataFrame({
     "inputs": [
-        "MLflowとは何ですか？",
-        "MLflowのトラッキング機能はどのように動作しますか？",
-        "モデルレジストリとは何ですか？",
-        "MLflowを使ってモデルをデプロイする方法は？",
-        "MLflow Projectsとは何ですか？"
+        {"question": "MLflowとは何ですか？"},
+        {"question": "MLflowのトラッキング機能はどのように動作しますか？"},
+        {"question": "モデルレジストリとは何ですか？"},
+        {"question": "MLflowを使ってモデルをデプロイする方法は？"},
+        {"question": "MLflow Projectsとは何ですか？"}
     ],
     "expectations": [
         {"expected_response": "MLflowは機械学習ライフサイクル全体を管理するためのオープンソースプラットフォームです。"},
@@ -332,8 +332,8 @@ def qa_model(question: str) -> str:
     # Databricks Foundation Model APIを使用
     return call_fmapi(question)
 
-# 予測を生成
-eval_data["prediction"] = eval_data["inputs"].apply(qa_model)
+# 予測を生成（テスト用）
+eval_data["prediction"] = eval_data["inputs"].apply(lambda x: qa_model(x["question"]))
 
 print("=== 予測結果 ===")
 display(eval_data[["inputs", "prediction"]])
@@ -353,21 +353,29 @@ from mlflow.genai.scorers import RelevanceToQuery, Correctness, Safety
 def predict_fn(inputs):
     """
     評価用のpredict関数
-    inputs: 'inputs'カラムを持つDataFrameまたは文字列のリスト
+    inputs: 辞書のリストまたは辞書形式の'inputs'カラムを持つDataFrame
+    各辞書は {"question": "質問文"} の形式
     returns: 予測結果のリスト
     """
     results = []
 
     # DataFrameの場合
     if isinstance(inputs, pd.DataFrame):
-        for question in inputs['inputs']:
+        for input_dict in inputs['inputs']:
+            question = input_dict["question"]
             prediction = qa_model(question)
             results.append(prediction)
-    # リストの場合
+    # リストの場合（辞書のリスト）
+    elif isinstance(inputs, list):
+        for input_dict in inputs:
+            question = input_dict["question"]
+            prediction = qa_model(question)
+            results.append(prediction)
+    # 単一の辞書の場合
     else:
-        for question in inputs:
-            prediction = qa_model(question)
-            results.append(prediction)
+        question = inputs["question"]
+        prediction = qa_model(question)
+        results.append(prediction)
 
     return results
 
