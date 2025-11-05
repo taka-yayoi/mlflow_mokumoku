@@ -499,30 +499,23 @@ fig.show()
 
 # COMMAND ----------
 
-# 最良のランを取得（モデルがログされているRunのみ）
-all_runs_for_load = mlflow.search_runs(order_by=["metrics.mse ASC"])
-runs_with_model_for_load = all_runs_for_load[all_runs_for_load['tags.mlflow.log-model.history'].notna()]
+# 最良のランを取得
+best_run_info = mlflow.search_runs(
+    order_by=["metrics.mse ASC"]
+).iloc[0]
 
-if len(runs_with_model_for_load) == 0:
-    print("❌ モデルがログされているRunが見つかりません")
-    print("Part 2またはPart 3を実行してモデルをログしてください")
-else:
-    best_run_info = runs_with_model_for_load.iloc[0]
-    best_run_id = best_run_info['run_id']
-    # run_nameカラムを取得（バージョン互換性のため）
-    best_model_name = best_run_info.get('run_name', best_run_info.get('tags.mlflow.runName', 'Unknown'))
+best_run_id = best_run_info['run_id']
+# run_nameカラムを取得（バージョン互換性のため）
+best_model_name = best_run_info.get('run_name', best_run_info.get('tags.mlflow.runName', 'Unknown'))
 
-    print(f"ロードするモデル: {best_model_name}")
-    print(f"Run ID: {best_run_id}")
+print(f"ロードするモデル: {best_model_name}")
+print(f"Run ID: {best_run_id}")
 
-if len(runs_with_model_for_load) > 0:
-    # モデルのロード
-    model_uri = f"runs:/{best_run_id}/model"
-    loaded_model = mlflow.pyfunc.load_model(model_uri)
+# モデルのロード
+model_uri = f"runs:/{best_run_id}/model"
+loaded_model = mlflow.pyfunc.load_model(model_uri)
 
-    print("\n✅ モデルのロード完了！")
-else:
-    print("⚠️ モデルのロードをスキップします")
+print("\n✅ モデルのロード完了！")
 
 # COMMAND ----------
 
@@ -531,24 +524,21 @@ else:
 
 # COMMAND ----------
 
-if len(runs_with_model_for_load) > 0:
-    # テストデータの一部で予測
-    sample_data = X_test[:5]
-    predictions = loaded_model.predict(sample_data)
+# テストデータの一部で予測
+sample_data = X_test[:5]
+predictions = loaded_model.predict(sample_data)
 
-    # 結果を表示
-    results_df = pd.DataFrame({
-        '予測値': predictions,
-        '実際の値': y_test[:5],
-        '誤差': np.abs(predictions - y_test[:5])
-    })
+# 結果を表示
+results_df = pd.DataFrame({
+    '予測値': predictions,
+    '実際の値': y_test[:5],
+    '誤差': np.abs(predictions - y_test[:5])
+})
 
-    print("=== 予測結果 ===")
-    display(results_df)
+print("=== 予測結果 ===")
+display(results_df)
 
-    print(f"\n平均誤差: {results_df['誤差'].mean():.2f}")
-else:
-    print("⚠️ モデルがロードされていないため、予測をスキップします")
+print(f"\n平均誤差: {results_df['誤差'].mean():.2f}")
 
 # COMMAND ----------
 
@@ -572,24 +562,17 @@ else:
 # COMMAND ----------
 
 # ベストモデルの情報を再取得
-# モデルがログされているRunのみを対象にする（tags.mlflow.log-model.historyが存在するもの）
-all_runs = mlflow.search_runs(order_by=["metrics.mse ASC"])
+best_run_info = mlflow.search_runs(
+    order_by=["metrics.mse ASC"]
+).iloc[0]
 
-# モデルがログされているRunをフィルタリング
-runs_with_model = all_runs[all_runs['tags.mlflow.log-model.history'].notna()]
+best_run_id = best_run_info['run_id']
+best_model_name = best_run_info.get('run_name', best_run_info.get('tags.mlflow.runName', 'Unknown'))
 
-if len(runs_with_model) == 0:
-    print("❌ モデルがログされているRunが見つかりません")
-    print("Part 2またはPart 3を実行してモデルをログしてください")
-else:
-    best_run_info = runs_with_model.iloc[0]
-    best_run_id = best_run_info['run_id']
-    best_model_name = best_run_info.get('run_name', best_run_info.get('tags.mlflow.runName', 'Unknown'))
-
-    print(f"登録するモデル: {best_model_name}")
-    print(f"Run ID: {best_run_id}")
-    print(f"MSE: {best_run_info['metrics.mse']:.2f}")
-    print(f"R² Score: {best_run_info['metrics.r2_score']:.3f}")
+print(f"登録するモデル: {best_model_name}")
+print(f"Run ID: {best_run_id}")
+print(f"MSE: {best_run_info['metrics.mse']:.2f}")
+print(f"R² Score: {best_run_info['metrics.r2_score']:.3f}")
 
 # Unity Catalogのモデル名を設定
 # フォーマット: カタログ名.スキーマ名.モデル名
@@ -600,17 +583,14 @@ print(f"\nUnity Catalogモデル名: {uc_model_name}")
 # COMMAND ----------
 
 # ベストモデルをUnity Catalogに登録
-if len(runs_with_model) > 0:
-    model_version = mlflow.register_model(
-        model_uri=f"runs:/{best_run_id}/model",
-        name=uc_model_name
-    )
+model_version = mlflow.register_model(
+    model_uri=f"runs:/{best_run_id}/model",
+    name=uc_model_name
+)
 
-    print(f"✅ モデルをUnity Catalogに登録しました！")
-    print(f"モデル名: {uc_model_name}")
-    print(f"バージョン: {model_version.version}")
-else:
-    print("⚠️ モデルがログされているRunがないため、Unity Catalogへの登録をスキップします")
+print(f"✅ モデルをUnity Catalogに登録しました！")
+print(f"モデル名: {uc_model_name}")
+print(f"バージョン: {model_version.version}")
 
 # COMMAND ----------
 
@@ -626,24 +606,21 @@ else:
 # 登録されたモデルの情報を取得
 from mlflow import MlflowClient
 
-if len(runs_with_model) > 0:
-    client = MlflowClient()
+client = MlflowClient()
 
-    # モデルの最新情報を取得
-    model_info = client.get_registered_model(uc_model_name)
+# モデルの最新情報を取得
+model_info = client.get_registered_model(uc_model_name)
 
-    print(f"=== モデル情報 ===")
-    print(f"モデル名: {model_info.name}")
-    print(f"作成日時: {model_info.creation_timestamp}")
-    print(f"最終更新: {model_info.last_updated_timestamp}")
+print(f"=== モデル情報 ===")
+print(f"モデル名: {model_info.name}")
+print(f"作成日時: {model_info.creation_timestamp}")
+print(f"最終更新: {model_info.last_updated_timestamp}")
 
-    # すべてのバージョンを表示
-    model_versions = client.search_model_versions(f"name='{uc_model_name}'")
-    print(f"\n登録されているバージョン数: {len(model_versions)}")
-    for mv in model_versions:
-        print(f"  - バージョン {mv.version}: {mv.current_stage} (Run ID: {mv.run_id})")
-else:
-    print("⚠️ 登録されたモデルがありません")
+# すべてのバージョンを表示
+model_versions = client.search_model_versions(f"name='{uc_model_name}'")
+print(f"\n登録されているバージョン数: {len(model_versions)}")
+for mv in model_versions:
+    print(f"  - バージョン {mv.version}: {mv.current_stage} (Run ID: {mv.run_id})")
 
 # COMMAND ----------
 
@@ -653,26 +630,23 @@ else:
 # COMMAND ----------
 
 # Unity Catalogからモデルをロード
-if len(runs_with_model) > 0:
-    # バージョンを指定しない場合、最新バージョンが使用されます
-    uc_loaded_model = mlflow.pyfunc.load_model(f"models:/{uc_model_name}/{model_version.version}")
+# バージョンを指定しない場合、最新バージョンが使用されます
+uc_loaded_model = mlflow.pyfunc.load_model(f"models:/{uc_model_name}/{model_version.version}")
 
-    # 予測を実行
-    sample_predictions = uc_loaded_model.predict(X_test[:3])
+# 予測を実行
+sample_predictions = uc_loaded_model.predict(X_test[:3])
 
-    # 結果を表示
-    uc_results_df = pd.DataFrame({
-        '予測値': sample_predictions,
-        '実際の値': y_test[:3],
-        '誤差': np.abs(sample_predictions - y_test[:3])
-    })
+# 結果を表示
+uc_results_df = pd.DataFrame({
+    '予測値': sample_predictions,
+    '実際の値': y_test[:3],
+    '誤差': np.abs(sample_predictions - y_test[:3])
+})
 
-    print("=== Unity Catalogモデルでの予測結果 ===")
-    display(uc_results_df)
+print("=== Unity Catalogモデルでの予測結果 ===")
+display(uc_results_df)
 
-    print("\n✅ Unity Catalogに登録したモデルで予測できました！")
-else:
-    print("⚠️ 登録されたモデルがないため、予測をスキップします")
+print("\n✅ Unity Catalogに登録したモデルで予測できました！")
 
 # COMMAND ----------
 
