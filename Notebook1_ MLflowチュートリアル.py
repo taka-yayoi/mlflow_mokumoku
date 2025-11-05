@@ -499,7 +499,7 @@ fig.show()
 
 # COMMAND ----------
 
-# 最良のランを取得
+# 最良のランを取得（artifact_uriを使用）
 best_run_info = mlflow.search_runs(
     order_by=["metrics.mse ASC"]
 ).iloc[0]
@@ -511,8 +511,9 @@ best_model_name = best_run_info.get('run_name', best_run_info.get('tags.mlflow.r
 print(f"ロードするモデル: {best_model_name}")
 print(f"Run ID: {best_run_id}")
 
-# モデルのロード
-model_uri = f"runs:/{best_run_id}/model"
+# モデルのロード（artifact_uriを使用してモデルパスを構築）
+artifact_uri = best_run_info['artifact_uri']
+model_uri = f"{artifact_uri}/model"
 loaded_model = mlflow.pyfunc.load_model(model_uri)
 
 print("\n✅ モデルのロード完了！")
@@ -562,17 +563,17 @@ print(f"\n平均誤差: {results_df['誤差'].mean():.2f}")
 # COMMAND ----------
 
 # ベストモデルの情報を再取得
-best_run_info = mlflow.search_runs(
+best_run_info_uc = mlflow.search_runs(
     order_by=["metrics.mse ASC"]
 ).iloc[0]
 
-best_run_id = best_run_info['run_id']
-best_model_name = best_run_info.get('run_name', best_run_info.get('tags.mlflow.runName', 'Unknown'))
+best_run_id_uc = best_run_info_uc['run_id']
+best_model_name_uc = best_run_info_uc.get('run_name', best_run_info_uc.get('tags.mlflow.runName', 'Unknown'))
 
-print(f"登録するモデル: {best_model_name}")
-print(f"Run ID: {best_run_id}")
-print(f"MSE: {best_run_info['metrics.mse']:.2f}")
-print(f"R² Score: {best_run_info['metrics.r2_score']:.3f}")
+print(f"登録するモデル: {best_model_name_uc}")
+print(f"Run ID: {best_run_id_uc}")
+print(f"MSE: {best_run_info_uc['metrics.mse']:.2f}")
+print(f"R² Score: {best_run_info_uc['metrics.r2_score']:.3f}")
 
 # Unity Catalogのモデル名を設定
 # フォーマット: カタログ名.スキーマ名.モデル名
@@ -582,9 +583,12 @@ print(f"\nUnity Catalogモデル名: {uc_model_name}")
 
 # COMMAND ----------
 
-# ベストモデルをUnity Catalogに登録
+# ベストモデルをUnity Catalogに登録（artifact_uriを使用）
+artifact_uri_uc = best_run_info_uc['artifact_uri']
+model_uri_uc = f"{artifact_uri_uc}/model"
+
 model_version = mlflow.register_model(
-    model_uri=f"runs:/{best_run_id}/model",
+    model_uri=model_uri_uc,
     name=uc_model_name
 )
 
