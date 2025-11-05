@@ -25,13 +25,14 @@
 # MAGIC 必要なライブラリをインストールします。
 # MAGIC - **MLflow**: 実験管理とトレーシング
 # MAGIC - **Databricks SDK**: Foundation Model APIアクセス
+# MAGIC - **Databricks Agents**: GenAI評価用
 # MAGIC - **OpenAI**: MLflow OpenAIトレーシング用
 # MAGIC - **Pandas**: データ処理
 
 # COMMAND ----------
 
 # MLflowとDatabricks SDKのインストール
-%pip install mlflow databricks-sdk openai pandas plotly
+%pip install mlflow databricks-sdk databricks-agents openai pandas plotly
 dbutils.library.restartPython()
 
 # COMMAND ----------
