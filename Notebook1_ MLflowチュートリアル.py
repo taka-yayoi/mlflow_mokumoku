@@ -499,11 +499,11 @@ fig.show()
 
 # COMMAND ----------
 
-# ログされたモデルを検索（MSEでソート）
+# ログされたモデルを検索（MSEの昇順でソート）
 logged_models = mlflow.search_logged_models(
-    filter_string="metrics.mse < 10000",  # 全てのモデルを対象
     order_by=[{"field_name": "metrics.mse", "ascending": True}],
-    max_results=50
+    max_results=50,
+    output_format="list"
 )
 
 if len(logged_models) == 0:
@@ -573,9 +573,9 @@ else:
 
 # ベストモデルの情報を再取得（ログされたモデルから）
 logged_models_uc = mlflow.search_logged_models(
-    filter_string="metrics.mse < 10000",
     order_by=[{"field_name": "metrics.mse", "ascending": True}],
-    max_results=50
+    max_results=50,
+    output_format="list"
 )
 
 if len(logged_models_uc) == 0:
