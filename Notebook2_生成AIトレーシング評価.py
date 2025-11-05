@@ -384,7 +384,7 @@ with mlflow.start_run(run_name="QA Model Evaluation with All Judges"):
 # MAGIC
 # MAGIC Part 3とPart 4の詳細な実装については、以下の記事を参照してください：
 # MAGIC
-# MAGIC 📖 **[MLflow GenAI Evaluationによる生成AIアプリケーション評価](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)**
+# MAGIC 📖 **[MLflow3とDatabricksで実現するLLMops](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)**
 # MAGIC
 # MAGIC この記事では、以下の内容を詳しく解説しています：
 # MAGIC - LoggedModelの実装方法
@@ -444,7 +444,7 @@ with mlflow.start_run(run_name="QA Model Evaluation with All Judges"):
 # MAGIC
 # MAGIC 本番環境モニタリングの詳細な実装については、以下の記事を参照してください：
 # MAGIC
-# MAGIC 📖 **[MLflow GenAI Evaluationによる生成AIアプリケーション評価](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)**
+# MAGIC 📖 **[MLflow3とDatabricksで実現するLLMops](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)**
 # MAGIC
 # MAGIC その他の参考リンク：
 # MAGIC - [本番環境モニタリング（日本語）](https://docs.databricks.com/aws/ja/mlflow3/genai/eval-monitor/production-monitoring)
@@ -474,7 +474,7 @@ with mlflow.start_run(run_name="QA Model Evaluation with All Judges"):
 # MAGIC ### 📚 Part 3 & 4: 全体のライフサイクル
 # MAGIC Part 3（モデルのロギングとデプロイ）とPart 4（本番環境モニタリング）の詳細な実装については、以下の記事を参照してください：
 # MAGIC
-# MAGIC 📖 **[MLflow GenAI Evaluationによる生成AIアプリケーション評価](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)**
+# MAGIC 📖 **[MLflow3とDatabricksで実現するLLMops](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)**
 # MAGIC
 # MAGIC この記事では以下の内容を実装付きで詳しく解説しています：
 # MAGIC - LoggedModelの実装方法
@@ -494,7 +494,7 @@ with mlflow.start_run(run_name="QA Model Evaluation with All Judges"):
 # MAGIC 📖 参考リンク：
 # MAGIC - [MLflow LLMsガイド（英語）](https://mlflow.org/docs/latest/llms/index.html)
 # MAGIC - [Databricks LLMsガイド（日本語）](https://docs.databricks.com/ja/generative-ai/index.html)
-# MAGIC - [MLflow GenAI Evaluationによる生成AIアプリケーション評価（Qiita）](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)
+# MAGIC - [MLflow3とDatabricksで実現するLLMops（Qiita）](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)
 
 # COMMAND ----------
 
@@ -516,7 +516,7 @@ with mlflow.start_run(run_name="QA Model Evaluation with All Judges"):
 # MAGIC **Q4: デプロイやモニタリングの実装方法は？**
 # MAGIC
 # MAGIC A: 以下のQiita記事で実装付きで詳しく解説しています：
-# MAGIC - [MLflow GenAI Evaluationによる生成AIアプリケーション評価](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)
+# MAGIC - [MLflow3とDatabricksで実現するLLMops](https://qiita.com/taka_yayoi/items/2fd4c9fef0ffe8377f48)
 # MAGIC
 # MAGIC **Q5: もっと詳しく学ぶには？**
 # MAGIC
