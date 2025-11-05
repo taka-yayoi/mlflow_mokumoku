@@ -388,13 +388,22 @@ with mlflow.start_run(run_name="QA Model Evaluation with Judges"):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Part 3: Custom Judges APIの使用
+# MAGIC # Part 3: 追加のJudgesとカスタムScorerの使用
 # MAGIC
-# MAGIC **Judge**は、LLMの出力を評価するための評価者です。
+# MAGIC ## 評価者の種類
 # MAGIC
-# MAGIC ## Judgeの種類
-# MAGIC - **事前構築されたJudges**: MLflowが提供する標準的な評価者（Part 2で使用）
-# MAGIC - **カスタムScorer**: 独自の評価ロジックを実装
+# MAGIC MLflowには2種類の評価方法があります：
+# MAGIC
+# MAGIC ### 1. 事前構築されたJudges（Pre-built Judges）
+# MAGIC MLflowが提供する研究に裏付けられた標準的な評価者です：
+# MAGIC - `RelevanceToQuery`: 質問への関連性
+# MAGIC - `Correctness`: 正確性
+# MAGIC - `Safety`: 安全性
+# MAGIC - `RetrievalGroundedness`: 幻覚の検出
+# MAGIC - `Guidelines`: ガイドライン準拠
+# MAGIC
+# MAGIC ### 2. カスタムScorers
+# MAGIC ユーザーが独自に実装する評価関数です。プロジェクト固有の評価基準を実装できます。
 # MAGIC
 # MAGIC 📖 参考リンク：
 # MAGIC - [事前構築されたJudges（日本語）](https://docs.databricks.com/aws/ja/mlflow3/genai/eval-monitor/concepts/judges/pre-built-judges-scorers)
