@@ -350,34 +350,14 @@ display(eval_data[["inputs", "prediction"]])
 from mlflow.genai.scorers import RelevanceToQuery, Correctness, Safety
 
 # 評価用のpredict関数を作成
-def predict_fn(inputs):
+# predict_fnの引数名は、inputsカラムの辞書のキーと一致する必要がある
+def predict_fn(question):
     """
     評価用のpredict関数
-    inputs: 辞書のリストまたは辞書形式の'inputs'カラムを持つDataFrame
-    各辞書は {"question": "質問文"} の形式
-    returns: 予測結果のリスト
+    question: 質問文（文字列）
+    returns: 予測結果（文字列）
     """
-    results = []
-
-    # DataFrameの場合
-    if isinstance(inputs, pd.DataFrame):
-        for input_dict in inputs['inputs']:
-            question = input_dict["question"]
-            prediction = qa_model(question)
-            results.append(prediction)
-    # リストの場合（辞書のリスト）
-    elif isinstance(inputs, list):
-        for input_dict in inputs:
-            question = input_dict["question"]
-            prediction = qa_model(question)
-            results.append(prediction)
-    # 単一の辞書の場合
-    else:
-        question = inputs["question"]
-        prediction = qa_model(question)
-        results.append(prediction)
-
-    return results
+    return qa_model(question)
 
 # 評価の実行
 with mlflow.start_run(run_name="QA Model Evaluation with Judges"):
