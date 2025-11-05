@@ -421,18 +421,16 @@ with mlflow.start_run(run_name="Advanced Judges Evaluation"):
 
 # COMMAND ----------
 
+from mlflow.metrics.genai import make_genai_metric
+
 # カスタムScorer: 回答の長さを評価
-def length_scorer(inputs, outputs):
+def length_scorer_fn(eval_df):
     """
     回答の長さが適切かを評価
     """
     scores = []
-    for output in outputs:
-        if isinstance(output, dict):
-            text = output.get('text', output.get('content', str(output)))
-        else:
-            text = str(output)
-
+    for output in eval_df["outputs"]:
+        text = str(output)
         length = len(text)
         # 50-300文字が適切と仮定
         if 50 <= length <= 300:
@@ -443,27 +441,44 @@ def length_scorer(inputs, outputs):
             score = 0.7  # 長すぎるが許容
         scores.append(score)
 
-    return scores
+    return pd.Series(scores)
 
 # カスタムScorer: キーワードの存在を確認
-def keyword_scorer(inputs, outputs):
+def keyword_scorer_fn(eval_df):
     """
     重要なキーワードが含まれているかを評価
     """
     important_keywords = ["MLflow", "トラッキング", "モデル", "レジストリ", "プラットフォーム"]
     scores = []
 
-    for output in outputs:
-        if isinstance(output, dict):
-            text = output.get('text', output.get('content', str(output)))
-        else:
-            text = str(output)
-
+    for output in eval_df["outputs"]:
+        text = str(output)
         keyword_count = sum(1 for kw in important_keywords if kw in text)
         score = min(keyword_count / 2.0, 1.0)  # 最大1.0
         scores.append(score)
 
-    return scores
+    return pd.Series(scores)
+
+# カスタムメトリクスを作成
+length_scorer = make_genai_metric(
+    name="length_score",
+    definition="回答の長さが適切かを評価（50-300文字が最適）",
+    grading_prompt="",
+    parameters={},
+    aggregations=["mean", "variance"],
+    greater_is_better=True,
+    evaluation_fn=length_scorer_fn
+)
+
+keyword_scorer = make_genai_metric(
+    name="keyword_score",
+    definition="重要なキーワード（MLflow、トラッキング、モデル等）の含有率を評価",
+    grading_prompt="",
+    parameters={},
+    aggregations=["mean", "variance"],
+    greater_is_better=True,
+    evaluation_fn=keyword_scorer_fn
+)
 
 print("✅ カスタムScorerを2つ作成しました")
 
