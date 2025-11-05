@@ -297,6 +297,7 @@ import pandas as pd
 
 # 評価用のQAデータセット
 # mlflow.genai.evaluate()では 'inputs' と 'expectations' カラムが必要
+# expectationsは辞書形式である必要がある
 eval_data = pd.DataFrame({
     "inputs": [
         "MLflowとは何ですか？",
@@ -306,11 +307,11 @@ eval_data = pd.DataFrame({
         "MLflow Projectsとは何ですか？"
     ],
     "expectations": [
-        "MLflowは機械学習ライフサイクル全体を管理するためのオープンソースプラットフォームです。",
-        "MLflow Trackingを使用すると、MLコードを実行する際にパラメータ、メトリクス、アーティファクトをログできます。",
-        "モデルレジストリは、モデルのバージョンとライフサイクルを管理するための集中型モデルストアです。",
-        "MLflow Modelsは標準フォーマットを使用して、さまざまなプラットフォームにデプロイできます。",
-        "MLflow Projectsは、再利用可能で再現可能な形式でMLコードをパッケージ化します。"
+        {"expected_response": "MLflowは機械学習ライフサイクル全体を管理するためのオープンソースプラットフォームです。"},
+        {"expected_response": "MLflow Trackingを使用すると、MLコードを実行する際にパラメータ、メトリクス、アーティファクトをログできます。"},
+        {"expected_response": "モデルレジストリは、モデルのバージョンとライフサイクルを管理するための集中型モデルストアです。"},
+        {"expected_response": "MLflow Modelsは標準フォーマットを使用して、さまざまなプラットフォームにデプロイできます。"},
+        {"expected_response": "MLflow Projectsは、再利用可能で再現可能な形式でMLコードをパッケージ化します。"}
     ]
 })
 
