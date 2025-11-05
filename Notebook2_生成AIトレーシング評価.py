@@ -513,13 +513,154 @@ with mlflow.start_run(run_name="Custom Scorer Evaluation"):
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC # Part 3.5: モデルのロギングとデプロイ
+# MAGIC
+# MAGIC 評価が完了したら、モデルをLoggedModelとしてロギングし、サービングエンドポイントにデプロイします。
+# MAGIC
+# MAGIC ## デプロイの流れ
+# MAGIC
+# MAGIC 1. **LoggedModelとしてロギング**: RAGパイプラインをMLflowモデルとして保存
+# MAGIC 2. **Unity Catalogに登録**: モデルをUnity Catalogのモデルレジストリに登録
+# MAGIC 3. **サービングエンドポイントにデプロイ**: `databricks.agents.deploy()`でデプロイ
+# MAGIC 4. **エンドポイントのテスト**: デプロイされたエンドポイントを呼び出してテスト
+# MAGIC
+# MAGIC 📖 参考リンク：[Agent評価とデプロイ（日本語）](https://docs.databricks.com/ja/generative-ai/deploy-agent.html)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## LoggedModelとしてRAGパイプラインをロギング
+
+# COMMAND ----------
+
+import mlflow
+from mlflow.models import infer_signature
+
+# RAGパイプラインをMLflowモデルとしてラップ
+class RAGModel(mlflow.pyfunc.PythonModel):
+    """
+    RAGパイプラインをMLflowモデルとしてラップ
+    """
+    def predict(self, context, model_input):
+        """
+        予測関数
+        model_input: {"question": "質問文"} の形式
+        """
+        if isinstance(model_input, pd.DataFrame):
+            questions = model_input["question"].tolist()
+        else:
+            questions = [model_input["question"]]
+
+        results = []
+        for question in questions:
+            result = rag_pipeline(question)
+            results.append(result["answer"])
+
+        return results
+
+# モデルをロギング
+with mlflow.start_run(run_name="RAG Model Logging"):
+    # サンプル入力でシグネチャを推論
+    sample_input = pd.DataFrame({"question": ["MLflowとは何ですか？"]})
+    sample_output = rag_pipeline("MLflowとは何ですか？")["answer"]
+    signature = infer_signature(sample_input, [sample_output])
+
+    # モデルをロギング
+    mlflow.pyfunc.log_model(
+        artifact_path="rag_model",
+        python_model=RAGModel(),
+        signature=signature,
+        input_example=sample_input
+    )
+
+    # モデルURIを取得
+    model_uri = mlflow.get_artifact_uri("rag_model")
+    print(f"✅ モデルをロギングしました: {model_uri}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Unity Catalogに登録
+
+# COMMAND ----------
+
+# 最新のランからモデルを取得
+latest_run = mlflow.search_runs(order_by=["start_time desc"]).iloc[0]
+model_uri = f"runs:/{latest_run.run_id}/rag_model"
+
+# Unity Catalogに登録
+uc_model_name = "workspace.default.rag_qa_model"
+
+try:
+    model_version = mlflow.register_model(
+        model_uri=model_uri,
+        name=uc_model_name
+    )
+    print(f"✅ Unity Catalogに登録しました:")
+    print(f"   モデル名: {uc_model_name}")
+    print(f"   バージョン: {model_version.version}")
+except Exception as e:
+    print(f"⚠️ Unity Catalog登録エラー: {e}")
+    print("   このステップはオプションです。次に進んでください。")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## サービングエンドポイントにデプロイ
+# MAGIC
+# MAGIC ⚠️ **注意**: このセクションはコード例です。実際のデプロイには適切な権限とリソースが必要です。
+
+# COMMAND ----------
+
+print("=== サービングエンドポイントへのデプロイ ===\n")
+
+print("以下のコードでデプロイします：\n")
+print("from databricks import agents")
+print("")
+print("# エンドポイントにデプロイ")
+print("deployment = agents.deploy(")
+print(f"    model_name='{uc_model_name}',")
+print("    model_version=model_version.version,")
+print("    endpoint_name='rag-qa-endpoint'")
+print(")\n")
+
+print("📝 デプロイには数分かかります")
+print("📊 デプロイ後、Databricks UIの「サービングエンドポイント」から確認できます")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## デプロイされたエンドポイントのテスト（コード例）
+
+# COMMAND ----------
+
+print("=== エンドポイントのテスト ===\n")
+
+print("デプロイ後、以下のコードでエンドポイントを呼び出します：\n")
+print("from databricks.sdk import WorkspaceClient")
+print("")
+print("w = WorkspaceClient()")
+print("response = w.serving_endpoints.query(")
+print("    name='rag-qa-endpoint',")
+print("    inputs={'question': 'MLflowとは何ですか？'}")
+print(")")
+print("print(response)\n")
+
+print("✅ エンドポイントがデプロイされると、本番トラフィックでトレースが記録されます")
+print("📊 これらのトレースに対して、次のPart 4で自動評価を設定します")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC # Part 4: 本番環境モニタリング
 # MAGIC
-# MAGIC 本番環境で実行されているLLMアプリケーションのトレースに対して、**自動的に評価を実行**する機能を説明します。
+# MAGIC **前提条件**: Part 3.5でサービングエンドポイントにデプロイ済み
+# MAGIC
+# MAGIC デプロイされたエンドポイントで発生する本番トラフィックのトレースに対して、**自動的に評価を実行**します。
 # MAGIC
 # MAGIC ## 本番環境モニタリングとは
 # MAGIC
-# MAGIC 新しいトレースが記録されると、登録されたScorerが**自動的にバックグラウンドで評価を実行**します。
+# MAGIC サービングエンドポイントが受け取るリクエストは自動的にトレースされます。これらのトレースに対して、登録されたScorerが**バックグラウンドで自動評価**を実行します。
 # MAGIC
 # MAGIC ### 主要な機能
 # MAGIC
@@ -654,9 +795,14 @@ print("📖 詳細は公式ドキュメントを参照してください")
 # MAGIC - デバッグとパフォーマンス最適化が容易
 # MAGIC
 # MAGIC ### ✅ 評価（Evaluation）
-# MAGIC - 組み込みメトリクスで品質測定
-# MAGIC - カスタムJudgeで独自の評価基準を実装
-# MAGIC - 継続的な品質モニタリング
+# MAGIC - 事前構築されたJudgeで品質測定
+# MAGIC - カスタムScorerで独自の評価基準を実装
+# MAGIC - mlflow.genai.evaluate()で一括評価
+# MAGIC
+# MAGIC ### ✅ モデルのロギングとデプロイ
+# MAGIC - LoggedModelとしてRAGパイプラインを保存
+# MAGIC - Unity Catalogに登録
+# MAGIC - agents.deployでサービングエンドポイントにデプロイ
 # MAGIC
 # MAGIC ### ✅ 本番モニタリング
 # MAGIC - Scorerの登録とアクティブ化で自動評価
@@ -665,10 +811,10 @@ print("📖 詳細は公式ドキュメントを参照してください")
 # MAGIC
 # MAGIC ## 次のステップ
 # MAGIC
-# MAGIC - **実際のLLM APIとの統合**: OpenAI、Anthropicなど
-# MAGIC - **より高度な評価**: BLEU、ROUGE、BERTScoreなど
-# MAGIC - **A/Bテスト**: 複数のプロンプトやモデルを比較
-# MAGIC - **プロダクション展開**: MLflow Deploymentの活用
+# MAGIC - **実際のデプロイ**: agents.deployで本番環境にデプロイ
+# MAGIC - **より高度な評価**: 複数のJudgeを組み合わせた評価
+# MAGIC - **A/Bテスト**: 複数のモデルバージョンを比較
+# MAGIC - **モニタリングの最適化**: サンプリングレートの調整とコスト最適化
 # MAGIC
 # MAGIC 📖 参考リンク：
 # MAGIC - [MLflow LLMsガイド（英語）](https://mlflow.org/docs/latest/llms/index.html)
