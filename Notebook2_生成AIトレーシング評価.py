@@ -309,7 +309,7 @@ display(eval_data[["inputs", "prediction"]])
 
 # COMMAND ----------
 
-from mlflow.genai.scorers import RelevanceToQuery, Correctness, Safety
+from mlflow.genai.scorers import RelevanceToQuery, Correctness, Safety, RetrievalGroundedness, Guidelines
 
 # 評価用のpredict関数を作成
 # predict_fnの引数名は、inputsカラムの辞書のキーと一致する必要がある
@@ -321,15 +321,35 @@ def predict_fn(question):
     """
     return qa_model(question)
 
-# 評価の実行
-with mlflow.start_run(run_name="QA Model Evaluation with Judges"):
+# Guidelines Judge（ガイドライン準拠）の作成
+guidelines = Guidelines(
+    guidelines="""
+    良い回答の基準:
+    1. 簡潔で分かりやすい（50-300文字）
+    2. 専門用語を適切に使用
+    3. 具体的な説明を含む
+    """
+)
 
-    # Judge（評価者）を定義
+# 評価の実行
+with mlflow.start_run(run_name="QA Model Evaluation with All Judges"):
+
+    # すべての事前構築されたJudge（評価者）を定義
     judges = [
-        RelevanceToQuery(),  # 質問への関連性
-        Correctness(),       # 正確性（グラウンドトゥルースと比較）
-        Safety()             # 安全性（有害コンテンツの検出）
+        RelevanceToQuery(),        # 質問への関連性
+        Correctness(),             # 正確性（グラウンドトゥルースと比較）
+        Safety(),                  # 安全性（有害コンテンツの検出）
+        RetrievalGroundedness(),   # 幻覚の検出
+        guidelines                 # ガイドライン準拠
     ]
+
+    print("=== 使用するJudges ===")
+    print("1. RelevanceToQuery: 質問への関連性")
+    print("2. Correctness: 正確性（グラウンドトゥルースとの比較）")
+    print("3. Safety: 安全性（有害コンテンツの検出）")
+    print("4. RetrievalGroundedness: 幻覚の検出")
+    print("5. Guidelines: カスタムガイドライン準拠")
+    print()
 
     # mlflow.genai.evaluateで評価
     eval_results = mlflow.genai.evaluate(
@@ -343,177 +363,13 @@ with mlflow.start_run(run_name="QA Model Evaluation with Judges"):
     for metric_name, metric_value in eval_results.metrics.items():
         print(f"  {metric_name}: {metric_value:.3f}")
 
-    print("\n✅ 評価結果がMLflowに記録されました！")
+    print("\n✅ すべてのJudgeによる評価が完了しました！")
     print("📊 詳細な評価結果は右側の「Experiments」タブから確認できます")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC # Part 3: 追加のJudgesとカスタムScorerの使用
-# MAGIC
-# MAGIC ## 評価者の種類
-# MAGIC
-# MAGIC MLflowには2種類の評価方法があります：
-# MAGIC
-# MAGIC ### 1. 事前構築されたJudges（Pre-built Judges）
-# MAGIC MLflowが提供する研究に裏付けられた標準的な評価者です：
-# MAGIC - `RelevanceToQuery`: 質問への関連性
-# MAGIC - `Correctness`: 正確性
-# MAGIC - `Safety`: 安全性
-# MAGIC - `RetrievalGroundedness`: 幻覚の検出
-# MAGIC - `Guidelines`: ガイドライン準拠
-# MAGIC
-# MAGIC ### 2. カスタムScorers
-# MAGIC ユーザーが独自に実装する評価関数です。プロジェクト固有の評価基準を実装できます。
-# MAGIC
-# MAGIC 📖 参考リンク：
-# MAGIC - [事前構築されたJudges（日本語）](https://docs.databricks.com/aws/ja/mlflow3/genai/eval-monitor/concepts/judges/pre-built-judges-scorers)
-# MAGIC - [カスタムScorer（英語）](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html#custom-llm-evaluation-metrics)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## その他の事前構築されたJudgeの使用
-
-# COMMAND ----------
-
-from mlflow.genai.scorers import RetrievalGroundedness, Guidelines
-
-# Guidelines Judge（ガイドライン準拠）の作成
-guidelines = Guidelines(
-    guidelines="""
-    良い回答の基準:
-    1. 簡潔で分かりやすい
-    2. 専門用語を適切に使用
-    3. 具体例を含む
-    """
-)
-
-# 評価の実行
-with mlflow.start_run(run_name="Advanced Judges Evaluation"):
-
-    # Judge（評価者）を定義
-    advanced_judges = [
-        RetrievalGroundedness(),  # 幻覚の検出
-        guidelines                # ガイドライン準拠
-    ]
-
-    # mlflow.genai.evaluateで評価
-    eval_results = mlflow.genai.evaluate(
-        data=eval_data,
-        predict_fn=predict_fn,
-        scorers=advanced_judges
-    )
-
-    print("=== 追加評価結果 ===")
-    print(f"\n評価スコア:")
-    for metric_name, metric_value in eval_results.metrics.items():
-        print(f"  {metric_name}: {metric_value:.3f}")
-
-    print("\n✅ 追加評価結果がMLflowに記録されました！")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## カスタムScorerの作成
-# MAGIC
-# MAGIC 独自の評価基準を実装できます。
-
-# COMMAND ----------
-
-from mlflow.metrics.genai import make_genai_metric
-
-# カスタムScorer: 回答の長さを評価
-def length_scorer_fn(eval_df):
-    """
-    回答の長さが適切かを評価
-    """
-    scores = []
-    for output in eval_df["outputs"]:
-        text = str(output)
-        length = len(text)
-        # 50-300文字が適切と仮定
-        if 50 <= length <= 300:
-            score = 1.0
-        elif length < 50:
-            score = 0.5  # 短すぎる
-        else:
-            score = 0.7  # 長すぎるが許容
-        scores.append(score)
-
-    return pd.Series(scores)
-
-# カスタムScorer: キーワードの存在を確認
-def keyword_scorer_fn(eval_df):
-    """
-    重要なキーワードが含まれているかを評価
-    """
-    important_keywords = ["MLflow", "トラッキング", "モデル", "レジストリ", "プラットフォーム"]
-    scores = []
-
-    for output in eval_df["outputs"]:
-        text = str(output)
-        keyword_count = sum(1 for kw in important_keywords if kw in text)
-        score = min(keyword_count / 2.0, 1.0)  # 最大1.0
-        scores.append(score)
-
-    return pd.Series(scores)
-
-# カスタムメトリクスを作成
-length_scorer = make_genai_metric(
-    name="length_score",
-    definition="回答の長さが適切かを評価（50-300文字が最適）",
-    grading_prompt="",
-    parameters={},
-    aggregations=["mean", "variance"],
-    greater_is_better=True,
-    evaluation_fn=length_scorer_fn
-)
-
-keyword_scorer = make_genai_metric(
-    name="keyword_score",
-    definition="重要なキーワード（MLflow、トラッキング、モデル等）の含有率を評価",
-    grading_prompt="",
-    parameters={},
-    aggregations=["mean", "variance"],
-    greater_is_better=True,
-    evaluation_fn=keyword_scorer_fn
-)
-
-print("✅ カスタムScorerを2つ作成しました")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## カスタムScorerで評価
-
-# COMMAND ----------
-
-with mlflow.start_run(run_name="Custom Scorer Evaluation"):
-
-    # カスタムScorerで評価
-    custom_scorers = [
-        length_scorer,
-        keyword_scorer
-    ]
-
-    eval_results = mlflow.genai.evaluate(
-        data=eval_data,
-        predict_fn=predict_fn,
-        scorers=custom_scorers
-    )
-
-    print("=== カスタムScorer評価結果 ===")
-    print(f"\n評価スコア:")
-    for metric_name, metric_value in eval_results.metrics.items():
-        print(f"  {metric_name}: {metric_value:.3f}")
-
-    print("\n✅ カスタムScorer評価結果がMLflowに記録されました！")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC # Part 3.5: モデルのロギングとデプロイ
+# MAGIC # Part 3: モデルのロギングとデプロイ
 # MAGIC
 # MAGIC 評価が完了したら、モデルをLoggedModelとしてロギングし、サービングエンドポイントにデプロイします。
 # MAGIC
@@ -607,47 +463,70 @@ except Exception as e:
 
 # MAGIC %md
 # MAGIC ## サービングエンドポイントにデプロイ
-# MAGIC
-# MAGIC ⚠️ **注意**: このセクションはコード例です。実際のデプロイには適切な権限とリソースが必要です。
 
 # COMMAND ----------
 
+from databricks import agents
+
+# エンドポイント名
+endpoint_name = "rag-qa-endpoint"
+
 print("=== サービングエンドポイントへのデプロイ ===\n")
 
-print("以下のコードでデプロイします：\n")
-print("from databricks import agents")
-print("")
-print("# エンドポイントにデプロイ")
-print("deployment = agents.deploy(")
-print(f"    model_name='{uc_model_name}',")
-print("    model_version=model_version.version,")
-print("    endpoint_name='rag-qa-endpoint'")
-print(")\n")
+try:
+    # エンドポイントにデプロイ
+    deployment = agents.deploy(
+        model_name=uc_model_name,
+        model_version=model_version.version if 'model_version' in locals() else 1,
+        endpoint_name=endpoint_name
+    )
 
-print("📝 デプロイには数分かかります")
-print("📊 デプロイ後、Databricks UIの「サービングエンドポイント」から確認できます")
+    print(f"✅ デプロイ開始:")
+    print(f"   エンドポイント名: {endpoint_name}")
+    print(f"   モデル: {uc_model_name}")
+    print("\n📝 デプロイには数分かかります")
+    print("📊 Databricks UIの「サービングエンドポイント」から進捗を確認できます")
+
+except Exception as e:
+    print(f"⚠️ デプロイエラー: {e}")
+    print("\n代替案: 手動でデプロイする場合:")
+    print("1. Databricks UIの「サービングエンドポイント」に移動")
+    print(f"2. モデル '{uc_model_name}' を選択してエンドポイントを作成")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## デプロイされたエンドポイントのテスト（コード例）
+# MAGIC ## デプロイされたエンドポイントのテスト
 
 # COMMAND ----------
 
+from databricks.sdk import WorkspaceClient
+
+w = WorkspaceClient()
+
 print("=== エンドポイントのテスト ===\n")
 
-print("デプロイ後、以下のコードでエンドポイントを呼び出します：\n")
-print("from databricks.sdk import WorkspaceClient")
-print("")
-print("w = WorkspaceClient()")
-print("response = w.serving_endpoints.query(")
-print("    name='rag-qa-endpoint',")
-print("    inputs={'question': 'MLflowとは何ですか？'}")
-print(")")
-print("print(response)\n")
+try:
+    # エンドポイントを呼び出し
+    response = w.serving_endpoints.query(
+        name=endpoint_name,
+        inputs={"question": "MLflowとは何ですか？"}
+    )
 
-print("✅ エンドポイントがデプロイされると、本番トラフィックでトレースが記録されます")
-print("📊 これらのトレースに対して、次のPart 4で自動評価を設定します")
+    print("✅ エンドポイント呼び出し成功:")
+    print(f"   質問: MLflowとは何ですか？")
+    print(f"   回答: {response}\n")
+
+    print("✅ エンドポイントが正常に動作しています")
+    print("📊 本番トラフィックのトレースが記録されます")
+    print("📊 次のPart 4でこれらのトレースに自動評価を設定します")
+
+except Exception as e:
+    print(f"⚠️ エンドポイント呼び出しエラー: {e}")
+    print("\n考えられる原因:")
+    print("- エンドポイントのデプロイが完了していない（数分待ってから再試行）")
+    print("- エンドポイント名が間違っている")
+    print("- 権限が不足している")
 
 # COMMAND ----------
 
@@ -795,8 +674,8 @@ print("📖 詳細は公式ドキュメントを参照してください")
 # MAGIC - デバッグとパフォーマンス最適化が容易
 # MAGIC
 # MAGIC ### ✅ 評価（Evaluation）
-# MAGIC - 事前構築されたJudgeで品質測定
-# MAGIC - カスタムScorerで独自の評価基準を実装
+# MAGIC - すべての事前構築されたJudgeで品質測定
+# MAGIC - RelevanceToQuery, Correctness, Safety, RetrievalGroundedness, Guidelines
 # MAGIC - mlflow.genai.evaluate()で一括評価
 # MAGIC
 # MAGIC ### ✅ モデルのロギングとデプロイ
