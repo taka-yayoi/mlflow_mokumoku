@@ -7,8 +7,8 @@
 # MAGIC ## 本日の流れ
 # MAGIC 1. **環境セットアップ**: 必要なライブラリのインストール
 # MAGIC 2. **Part 1**: Tracingの基本とAuto-tracing
-# MAGIC 3. **Part 2**: GenAI Evaluationの実践
-# MAGIC 4. **Part 3**: Custom Judges APIの使用
+# MAGIC 3. **Part 2**: GenAI Evaluationの実践（事前構築されたJudge）
+# MAGIC 4. **Part 3**: モデルのロギングとデプロイ
 # MAGIC 5. **Part 4**: 本番環境モニタリング
 # MAGIC
 # MAGIC ※ Databricks Free Edition (Serverless Compute) で動作確認済みです
@@ -533,7 +533,7 @@ except Exception as e:
 # MAGIC %md
 # MAGIC # Part 4: 本番環境モニタリング
 # MAGIC
-# MAGIC **前提条件**: Part 3.5でサービングエンドポイントにデプロイ済み
+# MAGIC **前提条件**: Part 3でサービングエンドポイントにデプロイ済み
 # MAGIC
 # MAGIC デプロイされたエンドポイントで発生する本番トラフィックのトレースに対して、**自動的に評価を実行**します。
 # MAGIC
