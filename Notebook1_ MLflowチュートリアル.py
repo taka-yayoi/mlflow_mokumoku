@@ -512,12 +512,9 @@ if len(logged_models) == 0:
 else:
     # ベストモデル（MSEが最小）を取得
     best_model = logged_models[0]
-    run = mlflow.get_run(best_model.run_id)
-    best_mse = run.data.metrics.get('mse', 0)
 
-    print(f"ロードするモデル: {best_model.source}")
-    print(f"Run ID: {best_model.run_id}")
-    print(f"MSE: {best_mse:.2f}")
+    print(f"ロードするモデル: {best_model.name}")
+    print(f"モデルソース: {best_model.source}")
 
     # モデルのロード
     loaded_model = mlflow.pyfunc.load_model(best_model.source)
@@ -584,12 +581,9 @@ if len(logged_models_uc) == 0:
 else:
     # ベストモデル（MSEが最小）を取得
     best_model_uc = logged_models_uc[0]
-    run_uc = mlflow.get_run(best_model_uc.run_id)
-    best_mse_uc = run_uc.data.metrics.get('mse', 0)
 
-    print(f"登録するモデル: {best_model_uc.source}")
-    print(f"Run ID: {best_model_uc.run_id}")
-    print(f"MSE: {best_mse_uc:.2f}")
+    print(f"登録するモデル: {best_model_uc.name}")
+    print(f"モデルソース: {best_model_uc.source}")
 
     # Unity Catalogのモデル名を設定
     # フォーマット: カタログ名.スキーマ名.モデル名
@@ -641,7 +635,7 @@ if len(logged_models_uc) > 0:
     model_versions = client.search_model_versions(f"name='{uc_model_name}'")
     print(f"\n登録されているバージョン数: {len(model_versions)}")
     for mv in model_versions:
-        print(f"  - バージョン {mv.version}: {mv.current_stage} (Run ID: {mv.run_id})")
+        print(f"  - バージョン {mv.version}: ステータス={mv.status}")
 else:
     print("⚠️ 登録されたモデルがありません")
 
