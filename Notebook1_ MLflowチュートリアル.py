@@ -513,11 +513,11 @@ else:
     # ベストモデル（MSEが最小）を取得
     best_model = logged_models[0]
 
-    print(f"ロードするモデル: {best_model.name}")
-    print(f"モデルソース: {best_model.source}")
+    print(f"ロードするモデル名: {best_model.name}")
+    print(f"モデルURI: {best_model.model_uri}")
 
     # モデルのロード
-    loaded_model = mlflow.pyfunc.load_model(best_model.source)
+    loaded_model = mlflow.pyfunc.load_model(best_model.model_uri)
 
     print("\n✅ モデルのロード完了！")
 
@@ -582,8 +582,8 @@ else:
     # ベストモデル（MSEが最小）を取得
     best_model_uc = logged_models_uc[0]
 
-    print(f"登録するモデル: {best_model_uc.name}")
-    print(f"モデルソース: {best_model_uc.source}")
+    print(f"登録するモデル名: {best_model_uc.name}")
+    print(f"モデルURI: {best_model_uc.model_uri}")
 
     # Unity Catalogのモデル名を設定
     # フォーマット: カタログ名.スキーマ名.モデル名
@@ -596,7 +596,7 @@ else:
 # ベストモデルをUnity Catalogに登録
 if len(logged_models_uc) > 0:
     model_version = mlflow.register_model(
-        model_uri=best_model_uc.source,
+        model_uri=best_model_uc.model_uri,
         name=uc_model_name
     )
 
