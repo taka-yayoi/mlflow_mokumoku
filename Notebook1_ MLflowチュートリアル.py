@@ -10,6 +10,7 @@
 # MAGIC 3. **Part 2**: MLflowで同じ実験（課題解決を実感）
 # MAGIC 4. **Part 3**: 複数モデルの比較（MLflowの真価を発揮）
 # MAGIC 5. **Part 4**: モデルの再利用（実務での活用）
+# MAGIC 6. **Part 5**: Unity Catalogへのモデル登録（組織での共有）
 # MAGIC
 # MAGIC ※ Databricks Free Edition (Serverless Compute) で動作確認済みです
 # MAGIC
@@ -542,6 +543,135 @@ print(f"\n平均誤差: {results_df['誤差'].mean():.2f}")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC # Part 5: Unity Catalogへのモデル登録
+# MAGIC
+# MAGIC ベストモデルを**Unity Catalog**に登録して、組織全体で管理・共有できるようにします。
+# MAGIC
+# MAGIC ## Unity Catalogとは？
+# MAGIC - Databricksのデータとモデルのガバナンス機能
+# MAGIC - モデルのバージョン管理、アクセス制御、系譜追跡が可能
+# MAGIC - Databricks Free Editionでは `workspace.default` スキーマが最初から利用可能
+# MAGIC
+# MAGIC 📖 参考リンク：[Unity Catalogモデルレジストリ（日本語）](https://docs.databricks.com/ja/mlflow/model-registry.html)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## ベストモデルをUnity Catalogに登録
+
+# COMMAND ----------
+
+# ベストモデルの情報を再取得
+best_run_info = mlflow.search_runs(
+    order_by=["metrics.mse ASC"]
+).iloc[0]
+
+best_run_id = best_run_info['run_id']
+best_model_name = best_run_info.get('run_name', best_run_info.get('tags.mlflow.runName', 'Unknown'))
+
+print(f"登録するモデル: {best_model_name}")
+print(f"Run ID: {best_run_id}")
+print(f"MSE: {best_run_info['metrics.mse']:.2f}")
+print(f"R² Score: {best_run_info['metrics.r2_score']:.3f}")
+
+# Unity Catalogのモデル名を設定
+# フォーマット: カタログ名.スキーマ名.モデル名
+uc_model_name = "workspace.default.diabetes_prediction_model"
+
+print(f"\nUnity Catalogモデル名: {uc_model_name}")
+
+# COMMAND ----------
+
+# ベストモデルをUnity Catalogに登録
+model_version = mlflow.register_model(
+    model_uri=f"runs:/{best_run_id}/model",
+    name=uc_model_name
+)
+
+print(f"✅ モデルをUnity Catalogに登録しました！")
+print(f"モデル名: {uc_model_name}")
+print(f"バージョン: {model_version.version}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 登録されたモデルの確認
+# MAGIC
+# MAGIC Unity Catalogに登録したモデルは、以下の方法で確認できます：
+# MAGIC 1. **カタログエクスプローラー**: 左サイドバーの「Catalog」から `workspace` → `default` → モデル名
+# MAGIC 2. **コード**: MLflow APIを使用
+
+# COMMAND ----------
+
+# 登録されたモデルの情報を取得
+from mlflow import MlflowClient
+
+client = MlflowClient()
+
+# モデルの最新情報を取得
+model_info = client.get_registered_model(uc_model_name)
+
+print(f"=== モデル情報 ===")
+print(f"モデル名: {model_info.name}")
+print(f"作成日時: {model_info.creation_timestamp}")
+print(f"最終更新: {model_info.last_updated_timestamp}")
+
+# すべてのバージョンを表示
+model_versions = client.search_model_versions(f"name='{uc_model_name}'")
+print(f"\n登録されているバージョン数: {len(model_versions)}")
+for mv in model_versions:
+    print(f"  - バージョン {mv.version}: {mv.current_stage} (Run ID: {mv.run_id})")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Unity Catalogからモデルをロードして使用
+
+# COMMAND ----------
+
+# Unity Catalogからモデルをロード
+# バージョンを指定しない場合、最新バージョンが使用されます
+uc_loaded_model = mlflow.pyfunc.load_model(f"models:/{uc_model_name}/{model_version.version}")
+
+# 予測を実行
+sample_predictions = uc_loaded_model.predict(X_test[:3])
+
+# 結果を表示
+uc_results_df = pd.DataFrame({
+    '予測値': sample_predictions,
+    '実際の値': y_test[:3],
+    '誤差': np.abs(sample_predictions - y_test[:3])
+})
+
+print("=== Unity Catalogモデルでの予測結果 ===")
+display(uc_results_df)
+
+print("\n✅ Unity Catalogに登録したモデルで予測できました！")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Unity Catalogのメリット
+# MAGIC
+# MAGIC ### ✅ 一元管理
+# MAGIC - すべてのモデルが1箇所で管理される
+# MAGIC - カタログエクスプローラーから簡単にアクセス
+# MAGIC
+# MAGIC ### ✅ バージョン管理
+# MAGIC - モデルの全バージョンが保存される
+# MAGIC - いつでも過去のバージョンに戻せる
+# MAGIC
+# MAGIC ### ✅ アクセス制御
+# MAGIC - 誰がモデルを使用できるかを制御
+# MAGIC - 本番環境での誤使用を防止
+# MAGIC
+# MAGIC ### ✅ 系譜追跡（リネージ）
+# MAGIC - モデルがどのデータから作られたかを追跡
+# MAGIC - ガバナンスとコンプライアンスに対応
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC # まとめ：MLflowのメリット
 # MAGIC
 # MAGIC ## 今日体験したこと
@@ -564,6 +694,11 @@ print(f"\n平均誤差: {results_df['誤差'].mean():.2f}")
 # MAGIC ### ✅ チームでの共有
 # MAGIC - 実験結果をチームで共有
 # MAGIC - 「私のマシンでは動く」問題の解消
+# MAGIC
+# MAGIC ### ✅ Unity Catalogで組織全体での管理
+# MAGIC - モデルを一元管理
+# MAGIC - バージョン管理とアクセス制御
+# MAGIC - ガバナンスとコンプライアンスに対応
 # MAGIC
 # MAGIC ## 次のステップ
 # MAGIC
