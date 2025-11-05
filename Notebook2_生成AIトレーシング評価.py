@@ -226,20 +226,27 @@ if len(traces) > 0:
     print("=== 最新のトレース情報 ===")
     print(f"トレース件数: {len(traces)}")
 
-    # 基本情報のみを表示（Arrowエラーを回避）
+    # 主要な情報を表示
     print("\n最新のトレース:")
-    for i, row in traces.head(5).iterrows():
-        print(f"\n--- トレース {i+1} ---")
-        if 'request_id' in traces.columns:
-            print(f"  リクエストID: {row.get('request_id', 'N/A')}")
-        if 'trace_name' in traces.columns:
-            print(f"  トレース名: {row.get('trace_name', 'N/A')}")
-        if 'execution_time_ms' in traces.columns:
-            exec_time = row.get('execution_time_ms', 0)
-            if exec_time:
-                print(f"  実行時間: {exec_time:.2f}ms")
-        if 'status' in traces.columns:
-            print(f"  ステータス: {row.get('status', 'N/A')}")
+    for idx in range(min(5, len(traces))):
+        row = traces.iloc[idx]
+        print(f"\n--- トレース {idx+1} ---")
+
+        # 一般的なカラム名を試す
+        for col_name in ['trace_id', 'request_id', 'timestamp_ms', 'execution_time_ms',
+                         'status', 'request_metadata', 'tags']:
+            if col_name in traces.columns:
+                value = row[col_name]
+                if value is not None and str(value) != '' and str(value) != 'nan':
+                    # 辞書やリストは表示しない（複雑すぎるため）
+                    if not isinstance(value, (dict, list)):
+                        if 'time_ms' in col_name and isinstance(value, (int, float)):
+                            print(f"  {col_name}: {value:.2f}ms")
+                        else:
+                            print(f"  {col_name}: {value}")
+
+    print("\n✅ トレース情報を確認できます")
+    print("📊 より詳細な情報は右側の「Traces」タブから確認してください")
 else:
     print("⚠️ トレースが見つかりません")
 
@@ -253,12 +260,23 @@ else:
 # MAGIC ## 評価の重要性
 # MAGIC
 # MAGIC LLMの出力は確率的なので、以下を評価する必要があります：
-# MAGIC - **正確性（Accuracy）**: 回答が正しいか
+# MAGIC - **正確性（Correctness）**: 回答が正しいか
 # MAGIC - **関連性（Relevance）**: 質問に関連しているか
-# MAGIC - **有害性（Toxicity）**: 有害なコンテンツを含まないか
-# MAGIC - **幻覚（Hallucination）**: 事実と異なる情報を生成していないか
+# MAGIC - **安全性（Safety）**: 有害なコンテンツを含まないか
+# MAGIC - **幻覚（Groundedness）**: 事実と異なる情報を生成していないか
 # MAGIC
-# MAGIC 📖 参考リンク：[LLM Evaluation Guide（英語）](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html)
+# MAGIC ## 事前構築されたJudge
+# MAGIC
+# MAGIC MLflowは以下の事前構築されたJudgeを提供しています：
+# MAGIC - `RelevanceToQuery`: 質問への関連性
+# MAGIC - `Correctness`: 正確性（グラウンドトゥルースとの比較）
+# MAGIC - `Safety`: 安全性（有害コンテンツの検出）
+# MAGIC - `RetrievalGroundedness`: 幻覚の検出
+# MAGIC - `Guidelines`: ガイドライン準拠
+# MAGIC
+# MAGIC 📖 参考リンク：
+# MAGIC - [事前構築されたJudges（日本語）](https://docs.databricks.com/aws/ja/mlflow3/genai/eval-monitor/concepts/judges/pre-built-judges-scorers)
+# MAGIC - [LLM Evaluation Guide（英語）](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html)
 
 # COMMAND ----------
 
@@ -313,201 +331,192 @@ display(eval_data[["question", "prediction"]])
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 基本的な評価メトリクス
+# MAGIC ## 事前構築されたJudgeを使った評価
 # MAGIC
-# MAGIC MLflowの組み込み評価メトリクスを使います。
+# MAGIC MLflowの事前構築されたJudge（評価者）を使います。
 
 # COMMAND ----------
 
-from mlflow.metrics import exact_match, token_count
+from mlflow.genai.scorers import RelevanceToQuery, Correctness, Safety
+
+# 評価用のモデル関数を作成
+def qa_model_for_eval(inputs):
+    """
+    評価用のモデル関数（バッチ対応）
+    """
+    results = []
+    for input_row in inputs.to_dict('records'):
+        question = input_row['question']
+        prediction = qa_model(question)
+        results.append(prediction)
+    return results
 
 # 評価の実行
-with mlflow.start_run(run_name="QA Model Evaluation"):
+with mlflow.start_run(run_name="QA Model Evaluation with Judges"):
 
-    # メトリクスの計算
-    for idx, row in eval_data.iterrows():
-        # Exact Matchの計算
-        is_exact_match = row["prediction"] == row["ground_truth"]
-        mlflow.log_metric(f"exact_match_{idx}", int(is_exact_match))
+    # Judge（評価者）を定義
+    judges = [
+        RelevanceToQuery(),  # 質問への関連性
+        Correctness(),       # 正確性（グラウンドトゥルースと比較）
+        Safety()             # 安全性（有害コンテンツの検出）
+    ]
 
-        # トークン数の計算（簡易版）
-        token_count_pred = len(row["prediction"].split())
-        mlflow.log_metric(f"token_count_{idx}", token_count_pred)
-
-    # 全体の統計
-    accuracy = (eval_data["prediction"] == eval_data["ground_truth"]).mean()
-    avg_token_count = eval_data["prediction"].apply(lambda x: len(x.split())).mean()
-
-    mlflow.log_metric("overall_accuracy", accuracy)
-    mlflow.log_metric("avg_token_count", avg_token_count)
-
-    # 評価データを保存
-    mlflow.log_table(eval_data, artifact_file="evaluation_results.json")
+    # mlflow.genai.evaluateで評価
+    eval_results = mlflow.genai.evaluate(
+        data=eval_data,
+        model=qa_model_for_eval,
+        scorers=judges
+    )
 
     print("=== 評価結果 ===")
-    print(f"正確性: {accuracy:.2%}")
-    print(f"平均トークン数: {avg_token_count:.1f}")
+    print(f"\n評価スコア:")
+    for metric_name, metric_value in eval_results.metrics.items():
+        print(f"  {metric_name}: {metric_value:.3f}")
+
     print("\n✅ 評価結果がMLflowに記録されました！")
+    print("📊 詳細な評価結果は右側の「Experiments」タブから確認できます")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC # Part 3: Custom Judges APIの使用
 # MAGIC
-# MAGIC **Judge**は、LLMの出力を評価するための評価者（別のLLMや関数）です。
+# MAGIC **Judge**は、LLMの出力を評価するための評価者です。
 # MAGIC
 # MAGIC ## Judgeの種類
-# MAGIC - **Built-in Judges**: MLflowが提供する標準的な評価者
-# MAGIC - **Custom Judges**: 独自の評価ロジックを実装
+# MAGIC - **事前構築されたJudges**: MLflowが提供する標準的な評価者（Part 2で使用）
+# MAGIC - **カスタムScorer**: 独自の評価ロジックを実装
 # MAGIC
-# MAGIC 📖 参考リンク：[Custom Metrics（英語）](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html#custom-llm-evaluation-metrics)
+# MAGIC 📖 参考リンク：
+# MAGIC - [事前構築されたJudges（日本語）](https://docs.databricks.com/aws/ja/mlflow3/genai/eval-monitor/concepts/judges/pre-built-judges-scorers)
+# MAGIC - [カスタムScorer（英語）](https://mlflow.org/docs/latest/llms/llm-evaluate/index.html#custom-llm-evaluation-metrics)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## カスタムJudgeの作成
+# MAGIC ## その他の事前構築されたJudgeの使用
 
 # COMMAND ----------
 
-from mlflow.metrics.genai import make_genai_metric
+from mlflow.genai.scorers import RetrievalGroundedness, Guidelines
 
-# カスタムJudge 1: 回答の長さを評価
-def length_judge(predictions, targets=None, metrics=None):
+# Guidelines Judge（ガイドライン準拠）の作成
+guidelines = Guidelines(
+    guidelines="""
+    良い回答の基準:
+    1. 簡潔で分かりやすい
+    2. 専門用語を適切に使用
+    3. 具体例を含む
+    """
+)
+
+# 評価の実行
+with mlflow.start_run(run_name="Advanced Judges Evaluation"):
+
+    # Judge（評価者）を定義
+    advanced_judges = [
+        RetrievalGroundedness(),  # 幻覚の検出
+        guidelines                # ガイドライン準拠
+    ]
+
+    # mlflow.genai.evaluateで評価
+    eval_results = mlflow.genai.evaluate(
+        data=eval_data,
+        model=qa_model_for_eval,
+        scorers=advanced_judges
+    )
+
+    print("=== 追加評価結果 ===")
+    print(f"\n評価スコア:")
+    for metric_name, metric_value in eval_results.metrics.items():
+        print(f"  {metric_name}: {metric_value:.3f}")
+
+    print("\n✅ 追加評価結果がMLflowに記録されました！")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## カスタムScorerの作成
+# MAGIC
+# MAGIC 独自の評価基準を実装できます。
+
+# COMMAND ----------
+
+from mlflow.genai.scorers import make_genai_metric_scorer
+
+# カスタムScorer: 回答の長さを評価
+def length_scorer(inputs, outputs):
     """
     回答の長さが適切かを評価
     """
     scores = []
-    for pred in predictions:
-        length = len(pred.split())
-        # 10-50単語が適切と仮定
-        if 10 <= length <= 50:
+    for output in outputs:
+        if isinstance(output, dict):
+            text = output.get('text', output.get('content', str(output)))
+        else:
+            text = str(output)
+
+        length = len(text)
+        # 50-300文字が適切と仮定
+        if 50 <= length <= 300:
             score = 1.0
-        elif length < 10:
+        elif length < 50:
             score = 0.5  # 短すぎる
         else:
             score = 0.7  # 長すぎるが許容
         scores.append(score)
 
-    return {"scores": scores}
+    return scores
 
-# カスタムJudge 2: キーワードの存在を確認
-def keyword_judge(predictions, targets=None, metrics=None):
+# カスタムScorer: キーワードの存在を確認
+def keyword_scorer(inputs, outputs):
     """
     重要なキーワードが含まれているかを評価
     """
-    important_keywords = ["MLflow", "model", "tracking", "registry", "platform"]
+    important_keywords = ["MLflow", "トラッキング", "モデル", "レジストリ", "プラットフォーム"]
     scores = []
 
-    for pred in predictions:
-        pred_lower = pred.lower()
-        keyword_count = sum(1 for kw in important_keywords if kw.lower() in pred_lower)
+    for output in outputs:
+        if isinstance(output, dict):
+            text = output.get('text', output.get('content', str(output)))
+        else:
+            text = str(output)
+
+        keyword_count = sum(1 for kw in important_keywords if kw in text)
         score = min(keyword_count / 2.0, 1.0)  # 最大1.0
         scores.append(score)
 
-    return {"scores": scores}
+    return scores
 
-# カスタムJudge 3: 文の完全性を評価
-def completeness_judge(predictions, targets=None, metrics=None):
-    """
-    文が完全に終わっているかを評価
-    """
-    scores = []
-    for pred in predictions:
-        # ピリオド、疑問符、感嘆符で終わっているか
-        if pred.strip() and pred.strip()[-1] in '.!?':
-            score = 1.0
-        else:
-            score = 0.5
-        scores.append(score)
-
-    return {"scores": scores}
-
-print("✅ カスタムJudgeを3つ作成しました")
+print("✅ カスタムScorerを2つ作成しました")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## カスタムJudgeで評価
+# MAGIC ## カスタムScorerで評価
 
 # COMMAND ----------
 
-with mlflow.start_run(run_name="Custom Judge Evaluation"):
+with mlflow.start_run(run_name="Custom Scorer Evaluation"):
 
-    predictions = eval_data["prediction"].tolist()
+    # カスタムScorerで評価
+    custom_scorers = [
+        length_scorer,
+        keyword_scorer
+    ]
 
-    # 各Judgeで評価
-    length_result = length_judge(predictions)
-    keyword_result = keyword_judge(predictions)
-    completeness_result = completeness_judge(predictions)
-
-    # 結果をDataFrameに追加
-    eval_data["length_score"] = length_result["scores"]
-    eval_data["keyword_score"] = keyword_result["scores"]
-    eval_data["completeness_score"] = completeness_result["scores"]
-
-    # 総合スコアを計算
-    eval_data["overall_score"] = (
-        eval_data["length_score"] * 0.3 +
-        eval_data["keyword_score"] * 0.4 +
-        eval_data["completeness_score"] * 0.3
+    eval_results = mlflow.genai.evaluate(
+        data=eval_data,
+        model=qa_model_for_eval,
+        scorers=custom_scorers
     )
 
-    # 平均スコアをログ
-    mlflow.log_metric("avg_length_score", eval_data["length_score"].mean())
-    mlflow.log_metric("avg_keyword_score", eval_data["keyword_score"].mean())
-    mlflow.log_metric("avg_completeness_score", eval_data["completeness_score"].mean())
-    mlflow.log_metric("avg_overall_score", eval_data["overall_score"].mean())
+    print("=== カスタムScorer評価結果 ===")
+    print(f"\n評価スコア:")
+    for metric_name, metric_value in eval_results.metrics.items():
+        print(f"  {metric_name}: {metric_value:.3f}")
 
-    # 結果を保存
-    mlflow.log_table(eval_data, artifact_file="custom_judge_results.json")
-
-    print("=== カスタムJudge評価結果 ===")
-    display(eval_data[["question", "length_score", "keyword_score", "completeness_score", "overall_score"]])
-
-    print(f"\n平均スコア:")
-    print(f"  長さ: {eval_data['length_score'].mean():.2f}")
-    print(f"  キーワード: {eval_data['keyword_score'].mean():.2f}")
-    print(f"  完全性: {eval_data['completeness_score'].mean():.2f}")
-    print(f"  総合: {eval_data['overall_score'].mean():.2f}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## スコアの可視化
-
-# COMMAND ----------
-
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-
-# レーダーチャートで可視化
-categories = ['長さ', 'キーワード', '完全性']
-scores = [
-    eval_data['length_score'].mean(),
-    eval_data['keyword_score'].mean(),
-    eval_data['completeness_score'].mean()
-]
-
-fig = go.Figure()
-
-fig.add_trace(go.Scatterpolar(
-    r=scores,
-    theta=categories,
-    fill='toself',
-    name='スコア'
-))
-
-fig.update_layout(
-    polar=dict(
-        radialaxis=dict(
-            visible=True,
-            range=[0, 1]
-        )),
-    showlegend=False,
-    title="カスタムJudge評価スコア"
-)
-
-fig.show()
+    print("\n✅ カスタムScorer評価結果がMLflowに記録されました！")
 
 # COMMAND ----------
 
