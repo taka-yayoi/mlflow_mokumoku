@@ -499,27 +499,41 @@ fig.show()
 
 # COMMAND ----------
 
-# ログされたモデルを検索（MSEが最小のものを取得）
-logged_models = mlflow.search_logged_models(
-    filter_string="metrics.mse < 10000",  # 全てのモデルを対象
-    order_by=["metrics.mse ASC"],
-    max_results=1
-)
+# ログされたモデルを検索
+logged_models = mlflow.search_logged_models(max_results=100)
 
+# MSEでソートしてベストモデルを取得
 if len(logged_models) == 0:
     print("❌ ログされたモデルが見つかりません")
     print("Part 2またはPart 3を実行してモデルをログしてください")
 else:
-    best_model = logged_models[0]
-    best_run_id = best_model.run_id
+    # 各モデルのRunからMSEを取得してソート
+    models_with_metrics = []
+    for model in logged_models:
+        run = mlflow.get_run(model.run_id)
+        if 'mse' in run.data.metrics:
+            models_with_metrics.append({
+                'model': model,
+                'mse': run.data.metrics['mse']
+            })
 
-    print(f"ロードするモデル: {best_model.source}")
-    print(f"Run ID: {best_run_id}")
+    # MSEでソート
+    models_with_metrics.sort(key=lambda x: x['mse'])
 
-    # モデルのロード
-    loaded_model = mlflow.pyfunc.load_model(best_model.source)
+    if len(models_with_metrics) > 0:
+        best_model = models_with_metrics[0]['model']
+        best_mse = models_with_metrics[0]['mse']
 
-    print("\n✅ モデルのロード完了！")
+        print(f"ロードするモデル: {best_model.source}")
+        print(f"Run ID: {best_model.run_id}")
+        print(f"MSE: {best_mse:.2f}")
+
+        # モデルのロード
+        loaded_model = mlflow.pyfunc.load_model(best_model.source)
+
+        print("\n✅ モデルのロード完了！")
+    else:
+        print("❌ MSEメトリクスを持つモデルが見つかりません")
 
 # COMMAND ----------
 
@@ -528,7 +542,7 @@ else:
 
 # COMMAND ----------
 
-if len(logged_models) > 0:
+if len(logged_models) > 0 and len(models_with_metrics) > 0:
     # テストデータの一部で予測
     sample_data = X_test[:5]
     predictions = loaded_model.predict(sample_data)
@@ -569,31 +583,46 @@ else:
 # COMMAND ----------
 
 # ベストモデルの情報を再取得（ログされたモデルから）
-logged_models_uc = mlflow.search_logged_models(
-    filter_string="metrics.mse < 10000",
-    order_by=["metrics.mse ASC"],
-    max_results=1
-)
+logged_models_uc = mlflow.search_logged_models(max_results=100)
 
+# MSEでソートしてベストモデルを取得
 if len(logged_models_uc) == 0:
     print("❌ ログされたモデルが見つかりません")
     print("Part 2またはPart 3を実行してモデルをログしてください")
 else:
-    best_model_uc = logged_models_uc[0]
+    # 各モデルのRunからMSEを取得してソート
+    models_with_metrics_uc = []
+    for model in logged_models_uc:
+        run = mlflow.get_run(model.run_id)
+        if 'mse' in run.data.metrics:
+            models_with_metrics_uc.append({
+                'model': model,
+                'mse': run.data.metrics['mse']
+            })
 
-    print(f"登録するモデル: {best_model_uc.source}")
-    print(f"Run ID: {best_model_uc.run_id}")
+    # MSEでソート
+    models_with_metrics_uc.sort(key=lambda x: x['mse'])
 
-    # Unity Catalogのモデル名を設定
-    # フォーマット: カタログ名.スキーマ名.モデル名
-    uc_model_name = "workspace.default.diabetes_prediction_model"
+    if len(models_with_metrics_uc) > 0:
+        best_model_uc = models_with_metrics_uc[0]['model']
+        best_mse_uc = models_with_metrics_uc[0]['mse']
 
-    print(f"\nUnity Catalogモデル名: {uc_model_name}")
+        print(f"登録するモデル: {best_model_uc.source}")
+        print(f"Run ID: {best_model_uc.run_id}")
+        print(f"MSE: {best_mse_uc:.2f}")
+
+        # Unity Catalogのモデル名を設定
+        # フォーマット: カタログ名.スキーマ名.モデル名
+        uc_model_name = "workspace.default.diabetes_prediction_model"
+
+        print(f"\nUnity Catalogモデル名: {uc_model_name}")
+    else:
+        print("❌ MSEメトリクスを持つモデルが見つかりません")
 
 # COMMAND ----------
 
 # ベストモデルをUnity Catalogに登録
-if len(logged_models_uc) > 0:
+if len(logged_models_uc) > 0 and len(models_with_metrics_uc) > 0:
     model_version = mlflow.register_model(
         model_uri=best_model_uc.source,
         name=uc_model_name
@@ -619,7 +648,7 @@ else:
 # 登録されたモデルの情報を取得
 from mlflow import MlflowClient
 
-if len(logged_models_uc) > 0:
+if len(logged_models_uc) > 0 and len(models_with_metrics_uc) > 0:
     client = MlflowClient()
 
     # モデルの最新情報を取得
@@ -646,7 +675,7 @@ else:
 # COMMAND ----------
 
 # Unity Catalogからモデルをロード
-if len(logged_models_uc) > 0:
+if len(logged_models_uc) > 0 and len(models_with_metrics_uc) > 0:
     # バージョンを指定しない場合、最新バージョンが使用されます
     uc_loaded_model = mlflow.pyfunc.load_model(f"models:/{uc_model_name}/{model_version.version}")
 
